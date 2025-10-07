@@ -1,0 +1,1 @@
+print("Consumer test")
