@@ -82,6 +82,7 @@ match_schema = StructType([
                             ])
                         ))
                     ]))),
+                StructField("player_rank", StringType()),
                 StructField("queueId", IntegerType()),
                 StructField("queue_id", IntegerType()),
                 StructField("tft_game_type", StringType()),
