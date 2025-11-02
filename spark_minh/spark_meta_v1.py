@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
-
 from pyspark.sql.types import *
 
+# === Schema ===
 match_schema = StructType([
     StructField("metadata", StructType([
         StructField("data_version", StringType()),
@@ -60,12 +60,22 @@ match_schema = StructType([
     ]))
 ])
 
-
-spark = SparkSession.builder \
-    .appName("TFT-MatchData-Processor") \
-    .master("local[*]") \
+# === Spark Session ===
+spark = (
+    SparkSession.builder
+    .appName("TFT-MatchData-Processor")
+    .master("local[*]")
+    .config("spark.driver.memory", "8g")
+    .config("spark.hadoop.fs.file.impl.disable.cache", "true")
+    .config("spark.hadoop.fs.checksum.disabled", "true")
+    .config("spark.hadoop.validateOutputSpecs", "false")
+    .config("spark.hadoop.fs.local.impl", "org.apache.hadoop.fs.RawLocalFileSystem")  # ✅ Key fix
     .getOrCreate()
+)
 
-df = spark.read.json(r"TFT_ANALYZER\data_3580_matches\part-00000-a47f7a7f-88b7-48de-8129-7384dc4d7249-c000.json", schema=match_schema)
+# === Read Folder ===
+df = spark.read.json("/tmp/data/data_3580_matches", schema=match_schema)
+
+
 df.printSchema()
 df.show(2, truncate=False)
