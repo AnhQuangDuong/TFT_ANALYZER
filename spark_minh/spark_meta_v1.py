@@ -79,3 +79,34 @@ df = spark.read.json("/tmp/data/data_3580_matches", schema=match_schema)
 
 df.printSchema()
 df.show(2, truncate=False)
+
+from pyspark.sql import functions as F
+
+# Explode participants → units → items
+items_df = (
+    df
+    .withColumn("participant", F.explode("info.participants"))
+    .withColumn("unit", F.explode("participant.units"))
+    .withColumn("item", F.explode("unit.items"))
+    .select(
+        F.col("item").alias("item_id"),
+        F.col("participant.win").alias("win"),
+        F.col("participant.placement").alias("placement")
+    )
+)
+
+total_participants = df.select(
+    F.size("info.participants").alias("p")
+).agg(F.sum("p")).collect()[0][0]
+
+result = (
+    items_df.groupBy("item_id")
+    .agg(
+        F.count("*").alias("appear_count"),
+        F.avg("placement").alias("avg_placement"),
+        F.avg(F.col("win").cast("int")).alias("win_rate")
+    )
+    .withColumn("pick_rate", F.col("appear_count") / total_participants)
+    .orderBy(F.desc("win_rate"))
+)
+result.show(20, truncate=False)
