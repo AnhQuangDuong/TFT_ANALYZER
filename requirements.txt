@@ -1,0 +1,6 @@
+pyspark==3.5.0
+kafka-python
+pymongo
+requests
+python-dotenv
+beautifulsoup4
