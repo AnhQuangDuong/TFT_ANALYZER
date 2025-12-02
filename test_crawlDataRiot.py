@@ -5,6 +5,8 @@ import os
 from datetime import datetime, timezone, timedelta
 from urllib.parse import quote, unquote
 import time
+from datetime import datetime
+import pytz
 
 from kafka import KafkaProducer
 import json
@@ -137,19 +139,28 @@ def get_match_information(match_id, api_key):
     "Accept-Charset": "application/x-www-form-urlencoded; charset=UTF-8",
     "Origin": "https://developer.riotgames.com"
     }
-    response = requests.get(request_url_get_match_info, headers = request_headers)
+    try:
+        response = requests.get(request_url_get_match_info, headers = request_headers)
+    except:
+        time.sleep(120)
+        response = requests.get(request_url_get_match_info, headers = request_headers)
     if response.status_code == 200:
         match_info = response.json()
         return match_info
     elif response.status_code == 429:
         print("Limit exceeded. We will wait for 2 minutes before retrying...")
         time.sleep(120)
-        response = requests.get(request_url_get_match_info, headers = request_headers)
         # thu gui lai trong 3 lan
         for _ in range(3):
+            try:
+                response = requests.get(request_url_get_match_info, headers = request_headers)
+            except:
+                time.sleep(120)
+                response = requests.get(request_url_get_match_info, headers = request_headers)
             if response.status_code == 200:
                 match_info = response.json()
                 return match_info
+            time.sleep(60)
         raise RuntimeError(f"Error get match info after retrying 3 times with status code {response.status_code}")
 
     elif response.status_code == 401:
@@ -188,8 +199,11 @@ def get_match_history(puuid, player_rank, api_key, start = 0, endTime = None, st
     "Accept-Charset": "application/x-www-form-urlencoded; charset=UTF-8",
     "Origin": "https://developer.riotgames.com"
     }
-
-    response = requests.get(request_url_get_match_history, headers = request_headers)
+    try:
+        response = requests.get(request_url_get_match_history, headers = request_headers)
+    except:
+        time.sleep(120)
+        response = requests.get(request_url_get_match_history, headers = request_headers)
     if response.status_code == 200:
         list_match_ids = response.json()
         list_match_json = []
@@ -205,7 +219,11 @@ def get_match_history(puuid, player_rank, api_key, start = 0, endTime = None, st
         time.sleep(120)
         # try 3 times more
         for _ in range(3):
-            response = requests.get(request_url_get_match_history, headers = request_headers)
+            try:
+                response = requests.get(request_url_get_match_history, headers = request_headers)
+            except:
+                time.sleep(120)
+                response = requests.get(request_url_get_match_history, headers = request_headers)
             if response.status_code == 200:
                 list_match_ids = response.json()
                 list_match_json = []
@@ -215,6 +233,7 @@ def get_match_history(puuid, player_rank, api_key, start = 0, endTime = None, st
                         #match, participants, units, traits = extract_match_data(match_info_json)
                         list_match_json.append(match_info_json)
                 return list_match_json
+            time.sleep(60)
         raise RuntimeError(f"Error get match history after retrying 3 times with status code {response.status_code}")
     elif response.status_code == 401:
         raise RuntimeError(f"Please update your api_key in .env file")
@@ -253,12 +272,12 @@ producer = KafkaProducer(
 # Topic bạn muốn gửi tới
 topic_name = "match_history"
 
-num_crawled_players = 1000
+num_crawled_players = 500
 current_crawled_players = 0
 
-idx_page = 1
+idx_page = 19
 
-while True: # Crawl until getting total 1000 players 
+while True: # Crawl until getting total 10 players 
     response = requests.get(root_url + str(idx_page), headers = headers)
     idx_page+= 1
 
@@ -316,7 +335,7 @@ while True: # Crawl until getting total 1000 players
             for match in list_match_json:
                 #print(match)
                 future = producer.send(topic_name, value=match)
-                result = future.get(timeout=10)
+                result = future.get(timeout=600)
                 print("✅ Message sent to:", result.topic, "partition:", result.partition, "offset:", result.offset)
 
             # Đảm bảo gửi hết message trong buffer
@@ -328,5 +347,13 @@ while True: # Crawl until getting total 1000 players
     else:
         raise RuntimeError(f"Error from op.gg with {response.status_code}")
     
-    if current_crawled_players == num_crawled_players:
+    print(f"current_crawled_players: {current_crawled_players}")
+       
+    if current_crawled_players >= num_crawled_players:
+        vietnam_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+        current_time = datetime.now(vietnam_tz)
+        current_date = current_time.date()
+
+        with open('.env', 'w') as f:
+            f.write(f'DAY_CRAWL = "{current_date}"\n')
         break
