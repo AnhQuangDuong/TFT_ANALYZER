@@ -2,11 +2,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List
 
+
 @dataclass
 class Player:
     player_id: str
     summoner_name: str
     rank: str
+
 
 @dataclass
 class Match:
@@ -16,6 +18,7 @@ class Match:
     tft_game_type: str
     tft_set_core_name: str
 
+
 @dataclass
 class Participant:
     match_id: str
@@ -24,14 +27,16 @@ class Participant:
     level: int
     last_round: int
 
+
 @dataclass
 class Unit:
     match_id: str
     player_id: str
     character_id: str
-    rarity: int # giá tiền (tính từ 0)
-    tier: int  # số sao
+    rarity: int  # unit cost (0-based in Riot API)
+    tier: int    # star level
     item_names: List[str]
+
 
 @dataclass
 class Trait:
@@ -41,3 +46,14 @@ class Trait:
     tier_current: int
     tier_total: int
     num_units: int
+
+
+@dataclass
+class UnitStat:
+    unit_id: str
+    tier: str
+    avg_place: float
+    win_rate: float      # percent
+    frequency: float     # percent
+    games_with_unit: int
+    popular_items: List[str]
