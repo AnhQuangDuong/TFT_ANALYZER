@@ -1,6 +1,9 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.types import *
 from pyspark.sql.functions import from_json, col
+import time
+from datetime import datetime
+import pytz
 
 # run first time to download the spark kafka package
 #spark = SparkSession.builder.appName("TFT-MatchHistory-Stream").master("local[*]").config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0").getOrCreate()
@@ -93,16 +96,22 @@ match_schema = StructType([
         ]))
     ])
 
-df_raw = spark.readStream.format("kafka").option("kafka.bootstrap.servers", "192.168.200.128:9093").option("subscribe", "match_history").option("startingOffsets", "earliest").load()
+# .option("failOnDataLoss", "false"): chap nhan neu co data bi mat do qua trinh crawl hay bi chet server dan toi viec die kafka phai reset offset ve 0 khi khoi dong lai
+df_raw = spark.readStream.format("kafka").option("kafka.bootstrap.servers", "192.168.200.128:9093").option("subscribe", "match_history").option("startingOffsets", "earliest").option("failOnDataLoss", "false").load()
 
 parsed_df = df_raw.selectExpr("CAST(value AS STRING) as json_str").select(from_json(col("json_str"), match_schema).alias("data"))
+
+# vietnam_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+# current_time = datetime.now(vietnam_tz)
+# current_date = current_time.date()
+current_date = "2025-11-25"
 
 query = (
     parsed_df.writeStream
     .outputMode("append")
     .format("parquet")   # có thể đổi sang "json" hoặc "csv"
-    .option("path", "hdfs://192.168.200.128:9000/tft/stream_output")
-    .option("checkpointLocation", "hdfs://192.168.200.128:9000/tft/checkpoints")
+    .option("path", f"hdfs://192.168.200.128:9000/tft/{current_date}/stream_output")
+    .option("checkpointLocation", f"hdfs://192.168.200.128:9000/tft/{current_date}/checkpoints")
     .trigger(processingTime="30 seconds")
     .start()
 )
