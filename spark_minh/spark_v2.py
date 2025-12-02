@@ -80,7 +80,6 @@ df = spark.read.json("/tmp/data/data_3580_matches", schema=match_schema)
 df.printSchema()
 df.show(2, truncate=False)
 
-from pyspark.sql import functions as F
 
 # Explode participants → units → items
 from pyspark.sql import functions as F
