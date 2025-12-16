@@ -4,10 +4,13 @@ from pyspark.sql import types as T
 from pyspark.sql import Window
 from dotenv import load_dotenv
 import os
+import pytz
+from datetime import datetime
 
 load_dotenv()
-#day_crawl = os.getenv("DAY_CRAWL")
-day_crawl = "2025-11-25"
+vietnam_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+current_time = datetime.now(vietnam_tz)
+day_crawl = current_time.date()
 
 # Initialize Spark session with MongoDB connector
 spark = SparkSession.builder \
@@ -20,22 +23,22 @@ spark = SparkSession.builder \
 df = spark.read.parquet(f"hdfs://192.168.200.128:9000/tft/{day_crawl}/stream_output")
 
 # Filter duplicate matches
-df = df.withColumn("match_id", F.col("data.metadata.match_id")).dropDuplicates(["match_id"]).drop("match_id")
+df = df.withColumn("match_id", F.col("metadata.match_id")).dropDuplicates(["match_id"]).drop("match_id")
     
 print("Total matches loaded from HDFS:", df.count())
 
-# Filter standard game type and TFT Set 15
-df = df.filter(F.col("data.info.tft_game_type") == "standard")
-df = df.filter(F.col("data.info.tft_set_core_name") == "TFTSet15")
+# Filter standard game type and TFT Set 16
+df = df.filter(F.col("info.tft_game_type") == "standard")
+df = df.filter(F.col("info.tft_set_core_name") == "TFTSet16")
 
 # Calculate total matches for frequency calculation
 total_matches = df.count()
-print(f"Total standard TFTSet15 matches: {total_matches}")
+print(f"Total standard TFTSet16 matches: {total_matches}")
 
 # Explode participants to get units
 exploded_participants = df.select(
-    F.col("data.metadata.match_id").alias("match_id"),
-    F.posexplode("data.info.participants").alias("participant_index", "participant")
+    F.col("metadata.match_id").alias("match_id"),
+    F.posexplode("info.participants").alias("participant_index", "participant")
 )
 
 # Extract placement and units
@@ -58,10 +61,10 @@ flat_units = units_df.select(
     F.col("unit.tier").alias("unit_tier")
 )
 
-# Clean unit_id by removing TFT15_ prefix, and item prefix
+# Clean unit_id by removing TFT16_ prefix, and item prefix
 flat_units = flat_units.withColumn(
     "unit_id", 
-    F.regexp_replace(F.regexp_replace(F.col("unit_id"), "TFT15_", ""), "tft15_", "")
+    F.regexp_replace(F.regexp_replace(F.col("unit_id"), "TFT16_", ""), "tft16_", "")
 )
 
 # Apply function to clean prefix in item_names array
@@ -72,7 +75,7 @@ def clean_item_names_array(item_names):
     cleaned_items = []
     for item in item_names:
         if item is not None:
-            cleaned = item.replace("TFT_Item_", "").replace("TFT15_", "")
+            cleaned = item.replace("TFT_Item_", "").replace("TFT16_", "")
             cleaned_items.append(cleaned)
     return cleaned_items
 

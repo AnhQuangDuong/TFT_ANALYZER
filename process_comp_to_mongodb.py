@@ -3,10 +3,14 @@ from pyspark.sql import functions as F
 from pyspark.sql import types as T
 from dotenv import load_dotenv
 import os
+from datetime import datetime
+import pytz
 
 load_dotenv()
-#day_crawl = os.getenv("DAY_CRAWL")
-day_crawl = "2025-11-25"
+
+vietnam_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+current_time = datetime.now(vietnam_tz)
+day_crawl = current_time.date()
 
 # run first time to download the spark mongodb package
 # spark = SparkSession.builder.appName("ReadFromHDFS").config("spark.mongodb.write.connection.uri", "mongodb://localhost:27017/tft_db.compositions") \
@@ -22,24 +26,26 @@ spark = SparkSession.builder \
 # Read Parquet files from HDFS
 df = spark.read.parquet(f"hdfs://192.168.200.128:9000/tft/{day_crawl}/stream_output")
 
+df.show(5)
+
 # loc cac tran trung nhau
-df = df.withColumn("match_id", F.col("data.metadata.match_id")).dropDuplicates(["match_id"]).drop("match_id")
+df = df.withColumn("match_id", F.col("metadata.match_id")).dropDuplicates(["match_id"]).drop("match_id")
     
 print("Total matches loaded from HDFS:", df.count())
 
 # Show the data
 #df.show()
 
-df = df.filter(F.col("data.info.tft_game_type") == "standard")
+df = df.filter(F.col("info.tft_game_type") == "standard")
 # trong cot game_type co 3 gia tri unique: "standard", "pairs", "pve"
 
-# can phai filter them tft_set_core_name ="TFTSet15" do co nhieu set khac nhau vi du tai hien mua 7
-df = df.filter(F.col("data.info.tft_set_core_name") == "TFTSet15")
+# can phai filter them tft_set_core_name ="TFTSet16" do co nhieu set khac nhau vi du tai hien mua 7
+df = df.filter(F.col("info.tft_set_core_name") == "TFTSet16")
 
 exploded = df.select(
-    F.col("data.metadata.match_id").alias("match_id"),
-    F.col("data.info.player_rank").alias("player_rank"),
-    F.posexplode("data.info.participants").alias("participant_index", "participant")
+    F.col("metadata.match_id").alias("match_id"),
+    F.col("info.player_rank").alias("player_rank"),
+    F.posexplode("info.participants").alias("participant_index", "participant")
 )
 
 # in ra cac player_rank unique, neu rank khac nhau co the them window function de danh gia phan bo doi hinh theo rank
@@ -69,7 +75,7 @@ def create_comp_sig(units):
     unit_list = []
     for unit in units:
         #print(unit)
-        unit_list.append(unit['character_id'].replace("TFT15_","").replace("tft15_",""))
+        unit_list.append(unit['character_id'].replace("TFT16_","").replace("tft16_",""))
     unit_list.sort()
     return "|".join(unit_list)
 
@@ -109,7 +115,7 @@ def find_top_4_carry_from_collected(all_core_units):
     for core_units_row in all_core_units:
         if core_units_row:
             for unit in core_units_row:
-                character_id = unit['character_id'].replace("TFT15_", "").replace("tft15_", "")
+                character_id = unit['character_id'].replace("TFT16_", "").replace("tft16_", "")
                 if character_id in carry_count:
                     carry_count[character_id] += 1
                 else:

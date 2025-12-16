@@ -4,10 +4,13 @@ from pyspark.sql import types as T
 from pyspark.sql.window import Window
 from dotenv import load_dotenv
 import os
+import pytz
+from datetime import datetime
 
 load_dotenv()
-#day_crawl = os.getenv("DAY_CRAWL")
-day_crawl = "2025-11-25"
+vietnam_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+current_time = datetime.now(vietnam_tz)
+day_crawl = current_time.date()
 
 # Initialize Spark Session with MongoDB connector
 spark = SparkSession.builder \
@@ -20,20 +23,20 @@ spark = SparkSession.builder \
 df = spark.read.parquet(f"hdfs://192.168.200.128:9000/tft/{day_crawl}/stream_output")
 
 # Filter duplicate matches
-df = df.withColumn("match_id", F.col("data.metadata.match_id")).dropDuplicates(["match_id"]).drop("match_id")
+df = df.withColumn("match_id", F.col("metadata.match_id")).dropDuplicates(["match_id"]).drop("match_id")
     
 print("Total matches loaded from HDFS:", df.count())
 
 # Filter for standard games only
-df = df.filter(F.col("data.info.tft_game_type") == "standard")
+df = df.filter(F.col("info.tft_game_type") == "standard")
 
-# Filter for TFTSet15 only
-df = df.filter(F.col("data.info.tft_set_core_name") == "TFTSet15")
+# Filter for TFTSet16 only
+df = df.filter(F.col("info.tft_set_core_name") == "TFTSet16")
 
 # Explode participants to get individual players
 df_players = df.select(
-    F.col("data.metadata.match_id").alias("match_id"),
-    F.explode("data.info.participants").alias("player")
+    F.col("metadata.match_id").alias("match_id"),
+    F.explode("info.participants").alias("player")
 ).select(
     "match_id",
     F.col("player.placement").alias("placement"),
@@ -112,10 +115,10 @@ final_result = trait_stats.join(
 min_count = 100
 popular_traits = final_result.filter(F.col("count") >= min_count)
 
-# Strip TFT15_ prefix from trait_id
+# Strip TFT16_ prefix from trait_id
 popular_traits = popular_traits.withColumn(
     "trait_id",
-    F.regexp_replace(F.col("trait_id"), "TFT15_", "")
+    F.regexp_replace(F.col("trait_id"), "TFT16_", "")
 )
 
 # Sort by avg_place (best performance first) and drop unnecessary columns

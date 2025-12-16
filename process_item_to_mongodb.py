@@ -4,10 +4,13 @@ from pyspark.sql import types as T
 from pyspark.sql.window import Window
 from dotenv import load_dotenv
 import os
+import pytz
+from datetime import datetime
 
 load_dotenv()
-#day_crawl = os.getenv("DAY_CRAWL")
-day_crawl = "2025-11-25"
+vietnam_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+current_time = datetime.now(vietnam_tz)
+day_crawl = current_time.date()
 
 # Initialize Spark Session with MongoDB configuration
 spark = SparkSession.builder \
@@ -20,17 +23,17 @@ spark = SparkSession.builder \
 df = spark.read.parquet(f"hdfs://192.168.200.128:9000/tft/{day_crawl}/stream_output")
 
 # Remove duplicate matches
-df = df.withColumn("match_id", F.col("data.metadata.match_id")).dropDuplicates(["match_id"]).drop("match_id")
+df = df.withColumn("match_id", F.col("metadata.match_id")).dropDuplicates(["match_id"]).drop("match_id")
     
 print("Total matches loaded from HDFS:", df.count())
 
-# Filter standard games and TFTSet15
-df = df.filter(F.col("data.info.tft_game_type") == "standard")
-df = df.filter(F.col("data.info.tft_set_core_name") == "TFTSet15")
+# Filter standard games and TFTSet16
+df = df.filter(F.col("info.tft_game_type") == "standard")
+df = df.filter(F.col("info.tft_set_core_name") == "TFTSet16")
 
 # Step 1: Flatten data to get players
 df_players = df.select(
-    F.explode(F.col("data.info.participants")).alias("player")
+    F.explode(F.col("info.participants")).alias("player")
 ).select(
     F.col("player.placement").alias("placement"),
     F.col("player.units").alias("units")
@@ -146,7 +149,7 @@ popular_items_cleaned = popular_items.withColumn(
                                 F.col("item_id"), 
                                 "TFT_Item_", ""
                             ), 
-                            "TFT15_Item_", ""
+                            "TFT16_Item_", ""
                         ), 
                         "TFT4_Item_", ""
                     ), 
@@ -160,11 +163,11 @@ popular_items_cleaned = popular_items.withColumn(
     )
 )
 
-# Step 13: Clean popular units names (remove TFT15_ prefix)
+# Step 13: Clean popular units names (remove TFT16_ prefix)
 @F.udf(returnType=T.ArrayType(T.StringType()))
 def clean_unit_names(units):
     if units:
-        return [unit.replace("TFT15_", "").replace("tft15_", "") for unit in units]
+        return [unit.replace("TFT16_", "").replace("tft16_", "") for unit in units]
     return []
 
 popular_items_final = popular_items_cleaned.withColumn(
