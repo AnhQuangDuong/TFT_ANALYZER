@@ -62,75 +62,6 @@ def vn_time_to_game_datetime(vn_time_str: str, type_time: str) -> int:
         raise ValueError("type_time must be 's' or 'ms'")
     return game_datetime
 
-def extract_match_data(match_info_json):
-    match_id = match_info_json['metadata']['match_id']
-    info = match_info_json['info']
-    game_creation = game_datetime_to_vn_time(info['gameCreation'], 'ms')
-    game_datetime = game_datetime_to_vn_time(info['game_datetime'], 'ms')  # chuỗi thời gian VN
-    tft_game_type = info['tft_game_type']
-    tft_set_core_name = info['tft_set_core_name']
-    
-    match = Match(
-        match_id=match_id,
-        game_creation=game_creation,
-        game_datetime=game_datetime,
-        tft_game_type=tft_game_type,
-        tft_set_core_name=tft_set_core_name
-    )
-    
-    participants = []
-    units = []
-    traits = []
-    
-    for participant_info in info['participants']:
-        player_id = participant_info['puuid']
-        placement = participant_info['placement']
-        level = participant_info['level']
-        last_round = participant_info['last_round']
-        
-        participant = Participant(
-            match_id=match_id,
-            player_id=player_id,
-            placement=placement,
-            level=level,
-            last_round=last_round
-        )
-        participants.append(participant)
-        
-        for unit_info in participant_info.get('units', []):
-            character_id = unit_info['character_id']
-            rarity = unit_info['rarity']
-            tier = unit_info['tier']
-            item_names = [item for item in unit_info.get('itemNames', [])]
-            
-            unit = Unit(
-                match_id=match_id,
-                player_id=player_id,
-                character_id=character_id,
-                rarity=rarity,
-                tier=tier,
-                item_names=item_names
-            )
-            units.append(unit)
-        
-        for trait_info in participant_info.get('traits', []):
-            trait_name = trait_info['name']
-            num_units = trait_info['num_units']
-            tier_current = trait_info['tier_current']
-            tier_total = trait_info['tier_total']
-            
-            trait = Trait(
-                match_id=match_id,
-                player_id=player_id,
-                trait_name=trait_name,
-                num_units=num_units,
-                tier_current=tier_current,
-                tier_total=tier_total
-            )
-            traits.append(trait)
-    
-    return match, participants, units, traits
-
 def get_match_information(match_id, api_key):
     request_url_get_match_info = f"https://sea.api.riotgames.com/tft/match/v1/matches/{match_id}?api_key={api_key}"
     request_headers = {
@@ -210,7 +141,6 @@ def get_match_history(puuid, player_rank, api_key, start = 0, endTime = None, st
         for match_id in list_match_ids:
             match_info_json = get_match_information(match_id, api_key)
             if match_info_json:
-                #match, participants, units, traits = extract_match_data(match_info_json)
                 match_info_json['info']['player_rank'] = player_rank
                 list_match_json.append(match_info_json)
         return list_match_json
@@ -230,7 +160,6 @@ def get_match_history(puuid, player_rank, api_key, start = 0, endTime = None, st
                 for match_id in list_match_ids:
                     match_info_json = get_match_information(match_id, api_key)
                     if match_info_json:
-                        #match, participants, units, traits = extract_match_data(match_info_json)
                         list_match_json.append(match_info_json)
                 return list_match_json
             time.sleep(60)
@@ -272,12 +201,12 @@ producer = KafkaProducer(
 # Topic bạn muốn gửi tới
 topic_name = "match_history"
 
-num_crawled_players = 500
+num_crawled_players = 15
 current_crawled_players = 0
 
-idx_page = 19
+idx_page = 1
 
-while True: # Crawl until getting total 10 players 
+while True: # Crawl until getting total num_crawled_players players 
     response = requests.get(root_url + str(idx_page), headers = headers)
     idx_page+= 1
 
@@ -329,31 +258,32 @@ while True: # Crawl until getting total 10 players
             print(f"Player PUUID: {player_puuid}")
 
             list_match_json = get_match_history(player_puuid, player_rank, api_key, startTime = "2025-08-01 00:00:00" ,count = 10)
-            
+            list_match_json = {"player_name": player_name,
+                            "player_tag": player_tag,
+                            "player_rank": player_rank,
+                            "matches": list_match_json 
+                               }
 
-            # Gửi từng record
-            for match in list_match_json:
-                #print(match)
-                future = producer.send(topic_name, value=match)
-                result = future.get(timeout=600)
-                print("✅ Message sent to:", result.topic, "partition:", result.partition, "offset:", result.offset)
+            # Gui toan bo list match cua tung nguoi choi de dung cho speed layer
+            future = producer.send(topic_name, value = list_match_json)
+            result = future.get(timeout=600)
+            print("✅ Message sent to:", result.topic, "partition:", result.partition, "offset:", result.offset)
 
             # Đảm bảo gửi hết message trong buffer
             producer.flush()
 
             print(f"✅ All match records of {player_name}#{player_tag} have been sent to Kafka!")
             print("===============================================")
+
+            if current_crawled_players >= num_crawled_players:
+                break                
             
     else:
-        raise RuntimeError(f"Error from op.gg with {response.status_code}")
+        print(f"Error from op.gg with {response.status_code}")
+        print("Retrying...")
     
     print(f"current_crawled_players: {current_crawled_players}")
        
     if current_crawled_players >= num_crawled_players:
-        vietnam_tz = pytz.timezone('Asia/Ho_Chi_Minh')
-        current_time = datetime.now(vietnam_tz)
-        current_date = current_time.date()
-
-        with open('.env', 'w') as f:
-            f.write(f'DAY_CRAWL = "{current_date}"\n')
+        print("Crawling completed.")
         break
