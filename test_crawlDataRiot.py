@@ -11,8 +11,6 @@ import pytz
 from kafka import KafkaProducer
 import json
 
-from models import Player, Match, Participant, Unit, Trait
-
 def game_datetime_to_vn_time(game_datetime: int, type_time: str) -> str:
     """
     Chuyển đổi game_datetime (ms từ epoch) 
