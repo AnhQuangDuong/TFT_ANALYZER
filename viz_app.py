@@ -1,16 +1,17 @@
 import streamlit as st
 import pandas as pd
 from pymongo import MongoClient
+from datetime import datetime, timedelta
 
 # Page configuration
 st.set_page_config(
-    page_title="TFT Meta Analysis - Set 15",
+    page_title="TFT Meta Analysis - Set 16",
     page_icon="📊",
     layout="wide"
 )
 
 # Title
-st.title("🎮 TFT Meta Analysis - Set 15")
+st.title("🎮 TFT Meta Analysis - Set 16")
 st.markdown("---")
 
 # Connect to MongoDB
@@ -48,6 +49,14 @@ def get_items_data():
     collection = db["items"]
     items = list(collection.find({}, {"_id": 0}))
     return items
+
+# Batch Layer header and reset button
+st.subheader("📊 Batch Layer - Historical Analytics")
+col_reset1, col_reset2 = st.columns([6,2])
+with col_reset2:
+    if st.button("🔄 Refresh Data", key="refresh_batch"):
+        st.cache_data.clear()
+        st.rerun()
 
 # Create tabs for different views
 tab1, tab2, tab3, tab4 = st.tabs(["📋 Compositions", "⚔️ Units", "🎯 Traits", "🛡️ Items"])
@@ -298,3 +307,122 @@ with tab4:
     
     except Exception as e:
         st.error(f"Error loading items: {e}")
+
+# Real-time Speed Layer Section
+st.markdown("---")
+st.header("⚡ Real-Time Player Analytics (Speed Layer)")
+st.markdown("*Live streaming data from recent matches - Updates every 30 seconds*")
+
+# Function to get real-time player data
+def get_realtime_players():
+    db = client["tft_db"]
+    collection = db["players_speed"]
+    # Get last 10 players, sorted by timestamp descending
+    items = list(collection.find({}, {"_id": 0}).sort("timestamp", -1).limit(15))
+    return items
+
+try:
+    realtime_data = get_realtime_players()
+    
+    if realtime_data:
+        # Display metrics
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Players Tracked", len(realtime_data))
+        with col2:
+            avg_placement = sum(p.get('avg_placement', 0) for p in realtime_data) / len(realtime_data)
+            st.metric("Avg Placement", f"{avg_placement:.2f}")
+        with col3:
+            avg_top4 = sum(p.get('top4_rate', 0) for p in realtime_data) / len(realtime_data)
+            st.metric("Avg Top 4 Rate", f"{avg_top4:.1f}%")
+        with col4:
+            total_games = sum(p.get('total_games', 0) for p in realtime_data)
+            st.metric("Total Games", total_games)
+        
+        # Create DataFrame for display
+        players_list = []
+        for player in realtime_data:
+            # Add 7 hours to timestamp if it exists
+            timestamp = player.get('timestamp', 'N/A')
+            if timestamp != 'N/A' and isinstance(timestamp, datetime):
+                timestamp = timestamp + timedelta(hours=7)
+            
+            player_info = {
+                "Player": f"{player.get('player_name', 'N/A')}#{player.get('player_tag', 'N/A')}",
+                "Rank": player.get('player_rank', 'N/A'),
+                "Games": player.get('total_games', 0),
+                "Avg Place": player.get('avg_placement', 0),
+                "Top 4 Rate": player.get('top4_rate', 0),
+                "Top 4 Count": player.get('top4_count', 0),
+                "1st": player.get('placement_distribution', {}).get('1st', 0),
+                "2nd": player.get('placement_distribution', {}).get('2nd', 0),
+                "3rd": player.get('placement_distribution', {}).get('3rd', 0),
+                "4th": player.get('placement_distribution', {}).get('4th', 0),
+                "5th": player.get('placement_distribution', {}).get('5th', 0),
+                "6th": player.get('placement_distribution', {}).get('6th', 0),
+                "7th": player.get('placement_distribution', {}).get('7th', 0),
+                "8th": player.get('placement_distribution', {}).get('8th', 0),
+                "Last Update": timestamp
+            }
+            players_list.append(player_info)
+        
+        df_realtime = pd.DataFrame(players_list)
+        
+        # Display table
+        st.dataframe(
+            df_realtime,
+            column_config={
+                "Player": st.column_config.TextColumn(
+                    "Player",
+                    width="large"
+                ),
+                "Rank": st.column_config.TextColumn(
+                    "Rank",
+                    width="small"
+                ),
+                "Games": st.column_config.NumberColumn(
+                    "Games",
+                    format="%d",
+                ),
+                "Avg Place": st.column_config.NumberColumn(
+                    "Avg Place",
+                    format="%.2f",
+                ),
+                "Top 4 Rate": st.column_config.NumberColumn(
+                    "Top 4 %",
+                    format="%.1f%%",
+                ),
+                "Top 4 Count": st.column_config.NumberColumn(
+                    "Top 4",
+                    format="%d",
+                ),
+                "1st": st.column_config.NumberColumn("1st", format="%d"),
+                "2nd": st.column_config.NumberColumn("2nd", format="%d"),
+                "3rd": st.column_config.NumberColumn("3rd", format="%d"),
+                "4th": st.column_config.NumberColumn("4th", format="%d"),
+                "5th": st.column_config.NumberColumn("5th", format="%d"),
+                "6th": st.column_config.NumberColumn("6th", format="%d"),
+                "7th": st.column_config.NumberColumn("7th", format="%d"),
+                "8th": st.column_config.NumberColumn("8th", format="%d"),
+                "Last Update": st.column_config.DatetimeColumn(
+                    "Last Update",
+                    width="medium"
+                )
+            },
+            hide_index=True,
+            width = 'stretch'
+        )
+        
+        # Auto-refresh button
+        if st.button("🔄 Refresh Real-time Data"):
+            st.rerun()
+    
+    else:
+        st.info("No real-time player data available yet. Waiting for streaming data...")
+        if st.button("🔄 Check Again"):
+            st.rerun()
+
+except Exception as e:
+    st.error(f"Error loading real-time data: {e}")
+    import traceback
+    st.code(traceback.format_exc())
