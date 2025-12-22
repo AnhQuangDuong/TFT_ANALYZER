@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-streaming-deployment
+  labels:
+    app: spark-streaming
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-streaming
+  template:
+    metadata:
+      labels:
+        app: spark-streaming
+    spec:
+      containers:
+      - name: spark-streaming
+        image: spark-streaming:latest
+        imagePullPolicy: Never
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "192.168.200.128:9093"
+        - name: KAFKA_TOPIC
+          value: "match_history"
+        - name: HDFS_NAMENODE
+          value: "hdfs://192.168.200.128:9000"
+        - name: MONGODB_URI
+          value: "mongodb://192.168.200.128:27017/"
+        - name: BATCH_TRIGGER_SECONDS
+          value: "30"
+        - name: HADOOP_USER_NAME
+          value: "anhdq"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"

@@ -1,0 +1,69 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tft-batch-layer
+  labels:
+    app: tft-batch-layer
+spec:
+  # Chạy mỗi 5 phút
+  schedule: "*/5 * * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: tft-batch-layer
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: batch-processor
+            image: tft-batch-layer:latest
+            imagePullPolicy: Never
+            env:
+            - name: HDFS_NAMENODE
+              value: "hdfs://192.168.200.128:9000"
+            - name: MONGODB_URI
+              value: "mongodb://192.168.200.128:27017/"
+            - name: HADOOP_USER_NAME
+              value: "anhdq"
+            resources:
+              requests:
+                memory: "2Gi"
+                cpu: "1000m"
+              limits:
+                memory: "4Gi"
+                cpu: "2000m"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tft-batch-layer-manual
+  labels:
+    app: tft-batch-layer
+spec:
+  template:
+    metadata:
+      labels:
+        app: tft-batch-layer
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: batch-processor
+        image: tft-batch-layer:latest
+        imagePullPolicy: Never
+        env:
+        - name: HDFS_NAMENODE
+          value: "hdfs://192.168.200.128:9000"
+        - name: MONGODB_URI
+          value: "mongodb://192.168.200.128:27017/"
+        - name: HADOOP_USER_NAME
+          value: "anhdq"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"

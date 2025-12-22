@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: riot-crawler-job
+  labels:
+    app: riot-crawler
+spec:
+  backoffLimit: 3
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app: riot-crawler
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: riot-crawler
+        image: riot-crawler:latest
+        imagePullPolicy: Never
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "192.168.200.128:9093"
+        - name: API_RIOT
+          value: "RGAPI-4227d61b-16c5-49b5-a6c6-401dfcc13c05"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
