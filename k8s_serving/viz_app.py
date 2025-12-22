@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from pymongo import MongoClient
 from datetime import datetime, timedelta
+import os
 
 # Page configuration
 st.set_page_config(
@@ -17,7 +18,8 @@ st.markdown("---")
 # Connect to MongoDB
 @st.cache_resource
 def init_connection():
-    return MongoClient("mongodb://localhost:27017/")
+    mongodb_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
+    return MongoClient(mongodb_uri)
 
 client = init_connection()
 

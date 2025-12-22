@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tft-serving-layer
+  labels:
+    app: tft-serving-layer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tft-serving-layer
+  template:
+    metadata:
+      labels:
+        app: tft-serving-layer
+    spec:
+      containers:
+      - name: streamlit-app
+        image: tft-serving-layer:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8501
+          name: http
+        env:
+        - name: MONGODB_URI
+          value: "mongodb://192.168.200.128:27017/"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tft-serving-layer
+  labels:
+    app: tft-serving-layer
+spec:
+  type: NodePort
+  ports:
+  - port: 8501
+    targetPort: 8501
+    nodePort: 30501
+    protocol: TCP
+    name: http
+  selector:
+    app: tft-serving-layer
+  externalIPs:
+  - 192.168.200.128

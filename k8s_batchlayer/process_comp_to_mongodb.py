@@ -8,6 +8,9 @@ import pytz
 
 load_dotenv()
 
+# Get MongoDB URI from environment variable or use default
+mongo_uri = os.getenv('MONGODB_URI', 'mongodb://192.168.200.128:27017/')
+
 vietnam_tz = pytz.timezone('Asia/Ho_Chi_Minh')
 current_time = datetime.now(vietnam_tz)
 day_crawl = current_time.date()
@@ -19,8 +22,8 @@ day_crawl = current_time.date()
 
 spark = SparkSession.builder \
     .appName("ProcessCompsToMongoDB") \
-    .config("spark.mongodb.write.connection.uri", "mongodb://localhost:27017/tft_db.compositions") \
-    .config("spark.jars", "/home/anhdq/.ivy2/jars/org.mongodb.spark_mongo-spark-connector_2.12-10.3.0.jar,/home/anhdq/.ivy2/jars/org.mongodb_mongodb-driver-sync-4.8.2.jar,/home/anhdq/.ivy2/jars/org.mongodb_bson-4.8.2.jar,/home/anhdq/.ivy2/jars/org.mongodb_mongodb-driver-core-4.8.2.jar") \
+    .config("spark.mongodb.write.connection.uri", f"{mongo_uri}tft_db.compositions") \
+    .config("spark.jars", "/app/jars/mongo-spark-connector_2.12-10.3.0.jar,/app/jars/mongodb-driver-sync-4.8.2.jar,/app/jars/bson-4.8.2.jar,/app/jars/mongodb-driver-core-4.8.2.jar") \
     .getOrCreate()
 
 # Read Parquet files from HDFS

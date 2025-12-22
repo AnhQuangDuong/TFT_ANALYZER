@@ -190,16 +190,18 @@ headers = {
 }
 
 # Khoi tao kafka producer
-# Kết nối tới Kafka cluster (chỉ cần 1 broker)
+# Kết nối tới Kafka cluster trên host machine (từ bên trong Kubernetes pod)
+# Sử dụng IP của host machine để kết nối từ Minikube pod
+kafka_bootstrap_servers = os.getenv('KAFKA_BOOTSTRAP_SERVERS', '192.168.200.128:9093')
 producer = KafkaProducer(
-    bootstrap_servers=['localhost:9093'],  # broker chính, Kafka tự biết các broker còn lại trong cluster
+    bootstrap_servers=[kafka_bootstrap_servers],  # broker chính, Kafka tự biết các broker còn lại trong cluster
     value_serializer=lambda v: json.dumps(v).encode('utf-8')  # chuyển dict → JSON → bytes
 )
 
 # Topic bạn muốn gửi tới
 topic_name = "match_history"
 
-num_crawled_players = 15
+num_crawled_players = 50
 current_crawled_players = 0
 
 idx_page = 1
